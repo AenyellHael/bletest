@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "bleTest",
+    "slug": "bleTest",
+    "version": "1.0.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4d94b7a3-a1a3-4b53-a82b-00f144917b4b"
+      }
+    }
+  },
+  "name": "bleTest"
+}
