@@ -16,6 +16,10 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.os.Build;
+import java.io.IOException;
+import java.io.OutputStream;
+import android.bluetooth.BluetoothSocket;
+import android.os.AsyncTask;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -221,6 +225,7 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
         public void onScanResult(int callbackType, ScanResult result) {
             BluetoothDevice device = result.getDevice();
             if (device.getName() != null && device.getName().startsWith("OXY")) {
+                sendLogsToJS("Device OXY find: " + device.getName());
                 // Добавить устройство в список найденных устройств
                 if (!foundDevices.contains(device)) {
                     foundDevices.add(device);
@@ -399,6 +404,49 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
                 sendLogsToJS("Permission for BLUETOOTH_SCAN not granted.");
             }
         }
+    }
+
+    @ReactMethod
+    public void sendData(final int fanLevel) {
+        sendLogsToJS("Send fanLevel: " + fanLevel);
+        new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected Void doInBackground(Void... params) {
+                BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                if (bluetoothAdapter == null) {
+                    // Bluetooth не поддерживается на этом устройстве
+                    return null;
+                }
+
+                BluetoothDevice device = bluetoothAdapter.getRemoteDevice("08:3A:F2:4B:C5:B2");
+                UUID serviceUUID = UUID.fromString("92758440-9725-11E9-B475-0800200C9A66");
+                UUID fanLevelUUID = UUID.fromString("92758442-9725-11E9-B475-0800200C9A66");
+                BluetoothSocket socket = null;
+
+                try {
+                    socket = device.createRfcommSocketToServiceRecord(serviceUUID);
+                    socket.connect();
+
+                    OutputStream outputStream = socket.getOutputStream();
+                    outputStream.write(fanLevel); // Отправка значения fanLevel
+                    outputStream.close();
+                } catch (IOException e) {
+                    sendLogsToJS("Error1: " + e.getMessage());
+                    // Обработка ошибок
+                } finally {
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (IOException e) {
+                            sendLogsToJS("Error2: " + e.getMessage());
+                            // Обработка ошибок
+                        }
+                    }
+                }
+
+                return null;
+            }
+        }.execute();
     }
 
 }

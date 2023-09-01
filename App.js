@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { View, Button, Text, NativeModules, DeviceEventEmitter, ScrollView } from 'react-native';
+import { View, Button, Text, NativeModules, DeviceEventEmitter, ScrollView, TextInput } from 'react-native';
 const { BluetoothScanModule } = NativeModules;
 
 class App extends Component {
@@ -8,12 +8,25 @@ class App extends Component {
     this.state = {
       devices: [],
       logs: '',
+      inputData: '',
     };
 
     // Подписываемся на событие "DeviceFound"
     DeviceEventEmitter.addListener('LogsUpdated', this.updateLogs);
     DeviceEventEmitter.addListener('DeviceFound', this.handleDeviceFound); // Обработчик события DeviceFound
   }
+
+  sendData = () => {
+    const { inputData } = this.state;
+    // Преобразовываем строку в целое число (integer)
+    const fanLevel = parseInt(inputData, 10); // 10 указывает на десятичную систему счисления
+    if (!isNaN(fanLevel)) { // Проверяем, удалось ли преобразование
+      BluetoothScanModule.sendData(fanLevel);
+    } else {
+      // Обработка ошибки ввода пользователя
+      console.error("Неверный ввод. Введите целое число.");
+    }
+  };
 
   componentDidMount() {
     BluetoothScanModule.makeDeviceDiscoverable(300);
@@ -36,20 +49,14 @@ class App extends Component {
   // Обработчик события "DeviceFound"
   handleDeviceFound = (event) => {
     const device = event; // Здесь предполагается, что событие содержит данные об устройстве
-    this.updateLogs(`event: ${JSON.stringify(device)}`)
-    this.updateLogs(`event.device: ${JSON.stringify(event?.devices)}`)
+    this.updateLogs(`event: ${JSON.stringify(device)}`);
+    this.updateLogs(`event.device: ${JSON.stringify(event?.devices)}`);
     this.setState((prevState) => ({
       devices: [...prevState.devices, device], // Добавляем новое устройство в массив устройств
     }));
   };
 
-  // bluetoothCheck() {
-  //   // BluetoothScanModule.getBluetoothAdapter();
-  //   BluetoothScanModule.enableBluetooth();
-  // }
-
   discoverDevices() {
-    // BluetoothScanModule.discoverDevices();
     BluetoothScanModule.discoverDevices();
   }
 
@@ -65,10 +72,23 @@ class App extends Component {
     BluetoothScanModule.findDevicesWithNamePrefix('OXY');
   }
 
+  connectOXY() {
+    BluetoothScanModule.pairWithDevice("OXY-5288", "08:3A:F2:4B:C5:B2");
+  }
+
   render() {
     return (
       <View>
         <Button title="Find OXY Devices" onPress={() => this.discoverDevices()} />
+        <Button title="OXY-5288" onPress={() => this.connectOXY()} />
+
+        <TextInput
+          placeholder="Введите данные для отправки"
+          value={this.state.inputData}
+          onChangeText={(inputData) => this.setState({ inputData })}
+          style={{ borderBottomWidth: 1, marginBottom: 10, paddingHorizontal: 8 }}
+        />
+        <Button title="Отправить" onPress={this.sendData} />
         
         <ScrollView>
           {this.state.devices.map((device, index) => (
