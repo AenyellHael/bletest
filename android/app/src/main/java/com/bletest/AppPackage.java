@@ -21,6 +21,7 @@ public class AppPackage implements ReactPackage {
         List<NativeModule> modules = new ArrayList<>();
 
         modules.add(new BluetoothScanModule(reactContext));
+        modules.add(new FanControlModule(reactContext));
 
         return modules;
     }

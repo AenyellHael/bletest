@@ -21,12 +21,17 @@ import java.io.OutputStream;
 import android.bluetooth.BluetoothSocket;
 import android.os.AsyncTask;
 
+
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import java.util.UUID;
+import java.util.Arrays;
+
+import com.facebook.react.bridge.Promise;
+import android.bluetooth.BluetoothProfile;
 
 import com.facebook.react.bridge.Callback;
 import java.util.Set;
@@ -44,6 +49,10 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
     private static final int REQUEST_ENABLE_BT = 1;
     private static final int REQUEST_CODE_BLUETOOTH_SCAN = 1;
     private static final int REQUEST_CODE_BLUETOOTH_CONNECT = 1;
+    private static final UUID fanLevelServiceUUID = UUID.fromString("92758440-9725-11e9-b475-0800200c9a66");
+    private static final UUID fanLevelCharacteristicUUID = UUID.fromString("92758442-9725-11e9-b475-0800200c9a66");
+    private Promise fanLevelPromise;
+    private BluetoothGatt bluetoothGatt;
     private final ReactApplicationContext reactContext;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeScanner bluetoothLeScanner;
@@ -449,4 +458,132 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
         }.execute();
     }
 
+    @ReactMethod
+    public void readFanLevel(String deviceAddress, final Promise promise) {
+        fanLevelPromise = promise; // Сохраняем Promise в переменную класса
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
+        bluetoothGatt = device.connectGatt(getReactApplicationContext(), false, gattCallback);
+
+        if (bluetoothGatt == null) {
+            fanLevelPromise.reject("CONNECTION_ERROR", "Unable to connect to the device.");
+            return;
+        }
+
+        bluetoothGatt.connect();
+    }
+
+    private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                gatt.discoverServices();
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                gatt.close();
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                BluetoothGattService service = gatt.getService(fanLevelServiceUUID);
+                if (service != null) {
+                    BluetoothGattCharacteristic characteristic = service.getCharacteristic(fanLevelCharacteristicUUID);
+                    if (characteristic != null) {
+                        gatt.readCharacteristic(characteristic);
+                    } else {
+                        fanLevelPromise.reject("CHARACTERISTIC_NOT_FOUND", "Fan Level characteristic not found.");
+                    }
+                } else {
+                    fanLevelPromise.reject("SERVICE_NOT_FOUND", "Fan Level service not found.");
+                }
+            } else {
+                fanLevelPromise.reject("SERVICE_DISCOVERY_FAILED", "Service discovery failed with status: " + status);
+            }
+        }
+
+        @Override
+        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                if (characteristic.getUuid().equals(fanLevelCharacteristicUUID)) {
+                    // int fanLevelValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+                    // Log.d("BluetoothScanModule", "Fan Level: " + fanLevelValue);
+                    byte[] fanLevelBytes = characteristic.getValue();
+                    String fanLevelString = new String(fanLevelBytes);
+                    Log.d("BluetoothScanModule", "Fan Level: " + fanLevelString);
+                    fanLevelPromise.resolve(fanLevelString); // Разрешаем Promise
+                    gatt.disconnect();
+                } else {
+                    fanLevelPromise.reject("INVALID_CHARACTERISTIC", "Unexpected characteristic read.");
+                    Log.d("BluetoothScanModule", "INVALID_CHARACTERISTIC: Unexpected characteristic read.");
+                }
+            } else {
+                fanLevelPromise.reject("CHARACTERISTIC_READ_FAILED", "Characteristic read failed with status: " + status);
+                Log.d("BluetoothScanModule", "CHARACTERISTIC_READ_FAILED, Characteristic read failed with status: " + status);
+            }
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            // Handle notifications or indications if needed
+        }
+    };
+
+    @ReactMethod
+    public void writeFanLevel(String deviceAddress, final Promise promise) {
+        fanLevelPromise = promise;
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
+        bluetoothGatt = device.connectGatt(getReactApplicationContext(), false, gattCallbackWrite);
+
+        if (bluetoothGatt == null) {
+            promise.reject("CONNECTION_ERROR", "Unable to connect to the device.");
+            Log.d("BluetoothScanModule", "CONNECTION_ERROR, Unable to connect to the device.");
+            return;
+        }
+        bluetoothGatt.connect();
+    }
+
+        private BluetoothGattCallback gattCallbackWrite = new BluetoothGattCallback() {
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    gatt.discoverServices();
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    gatt.close();
+                }
+            }
+
+            @Override
+            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                String fanLevel = "15";
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    BluetoothGattService service = gatt.getService(fanLevelServiceUUID);
+                    if (service != null) {
+                        BluetoothGattCharacteristic characteristic = service.getCharacteristic(fanLevelCharacteristicUUID);
+                        if (characteristic != null) {
+                            characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                            characteristic.setValue(fanLevel);
+                            boolean success = gatt.writeCharacteristic(characteristic);
+                            if (success) {
+                                fanLevelPromise.resolve("Write operation successful. " + fanLevel + " : " + characteristic);
+                                Log.d("BluetoothScanModule", "Write operation successful");
+                            } else {
+                                fanLevelPromise.reject("WRITE_FAILED", "Write operation failed");
+                                Log.d("BluetoothScanModule", "WRITE_FAILED, Write operation failed");
+                            }
+                            gatt.disconnect();
+                        } else {
+                            fanLevelPromise.reject("CHARACTERISTIC_NOT_FOUND", "Fan Level characteristic not found.");
+                        }
+                    } else {
+                        fanLevelPromise.reject("SERVICE_NOT_FOUND", "Fan Level service not found.");
+                    }
+                } else {
+                    fanLevelPromise.reject("SERVICE_DISCOVERY_FAILED", "Service discovery failed with status: " + status);
+                }
+            }
+            @Override
+            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                // Handle notifications or indications if needed
+            }
+        };
 }

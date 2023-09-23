@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { View, Button, Text, NativeModules, DeviceEventEmitter, ScrollView, TextInput } from 'react-native';
-const { BluetoothScanModule } = NativeModules;
+const { BluetoothScanModule, FanControlModule } = NativeModules;
 
 class App extends Component {
   constructor(props) {
@@ -15,18 +15,6 @@ class App extends Component {
     DeviceEventEmitter.addListener('LogsUpdated', this.updateLogs);
     DeviceEventEmitter.addListener('DeviceFound', this.handleDeviceFound); // Обработчик события DeviceFound
   }
-
-  sendData = () => {
-    const { inputData } = this.state;
-    // Преобразовываем строку в целое число (integer)
-    const fanLevel = parseInt(inputData, 10); // 10 указывает на десятичную систему счисления
-    if (!isNaN(fanLevel)) { // Проверяем, удалось ли преобразование
-      BluetoothScanModule.sendData(fanLevel);
-    } else {
-      // Обработка ошибки ввода пользователя
-      console.error("Неверный ввод. Введите целое число.");
-    }
-  };
 
   componentDidMount() {
     BluetoothScanModule.makeDeviceDiscoverable(300);
@@ -76,6 +64,56 @@ class App extends Component {
     BluetoothScanModule.pairWithDevice("OXY-5288", "08:3A:F2:4B:C5:B2");
   }
 
+  readFanLevel() {
+    BluetoothScanModule.readFanLevel('08:3A:F2:4B:C5:B2')
+  .then(fanLevelValue => {
+    console.log(`Fan Level: ${fanLevelValue}`);
+  })
+  .catch(error => {
+    console.error(`Error reading Fan Level: ${error}`);
+  });
+  }
+
+  writeFanLevel() {
+    BluetoothScanModule.writeFanLevel('08:3A:F2:4B:C5:B2')
+      .then(result => {
+        console.log(result);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+  }
+
+  readFanLevelModule() {
+    FanControlModule.connectToDevice('08:3A:F2:4B:C5:B2')
+    .then((connected) => {
+      if (connected) {
+        FanControlModule.readFanLevel()
+          .then((fanLevel) => {
+            console.log('Fan level:', fanLevel);
+          })
+          .catch((error) => {
+            console.error('Error reading fan level:', error);
+          });
+      } else {
+        console.error('Failed to connect to the device');
+      }
+    })
+    .catch((error) => {
+      console.error('Error connecting to the device:', error);
+    });
+  }
+
+  writeFanLevelModule() {
+    FanControlModule.writeFanLevel(25)
+    .then(() => {
+      console.log('Fan level written successfully');
+    })
+    .catch((error) => {
+      console.error('Error writing fan level:', error);
+    });
+  }
+
   render() {
     return (
       <View>
@@ -88,7 +126,9 @@ class App extends Component {
           onChangeText={(inputData) => this.setState({ inputData })}
           style={{ borderBottomWidth: 1, marginBottom: 10, paddingHorizontal: 8 }}
         />
-        <Button title="Отправить" onPress={this.sendData} />
+        {/* <Button title="Отправить" onPress={this.sendData} /> */}
+        <Button title="Read" onPress={this.readFanLevel} />
+        <Button title="Write" onPress={this.writeFanLevel} />
         
         <ScrollView>
           {this.state.devices.map((device, index) => (
