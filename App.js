@@ -44,7 +44,7 @@ class App extends Component {
     }));
   };
 
-  discoverDevices() {
+  discoverDevices() {// Не факт что это работает
     BluetoothScanModule.discoverDevices();
   }
 
