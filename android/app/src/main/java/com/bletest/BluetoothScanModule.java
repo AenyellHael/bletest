@@ -175,7 +175,7 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
             }, SCAN_PERIOD);
 
             // Начать сканирование Bluetooth устройств
-            foundDevices.clear(); // Очистить список найденных устройств перед началом нового сканирования
+            foundDevices.clear(); // Очистить список найденных устройств перед началом нового сканирования 
             scanning = true;
             bluetoothLeScanner.startScan(leScanCallback);
 
