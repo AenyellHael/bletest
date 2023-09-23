@@ -170,7 +170,7 @@ public class BluetoothScanModule extends ReactContextBaseJavaModule {
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    stopDeviceDiscovery(); // Остановить сканирование по истечении SCAN_PERIOD
+                    stopDeviceDiscovery(); // Остановить сканирование по истечении SCAN_PERIOD ddfg
                 }
             }, SCAN_PERIOD);
 
